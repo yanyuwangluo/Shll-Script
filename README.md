@@ -2,6 +2,8 @@
 # 项目介绍
 ###### -------------------------------------烟雨阁------------------------------------------
 ##### 本项目主要是`.sh`脚本-文件内如要为一键系列。
+# <p><img alt="Magic Code Wizards" src="https://cdn.jsdelivr.net/gh/yanyuwangluo/tuku@main/logo.png"/></p>
+# <p>欢迎访问：[我的网站](https://www.yanyuwangluo.cn/ "烟雨阁")💖</p>
 ------------
 
 # 免责声明
