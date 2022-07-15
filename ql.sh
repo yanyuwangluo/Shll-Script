@@ -13,19 +13,21 @@ echo -e "\e[36m
        ▀                        ▀████▀▀                                 ▀████▀▀
 \e[0m\n"
 
-DOCKER_IMG_NAME="whyour/qinglong"
+DOCKER_IMG_NAME="yanyuwangluo/qinglong"
 JD_PATH=""
 SHELL_FOLDER=$(pwd)
 CONTAINER_NAME=""
-TAG="latest"
+TAG="2.11.3"
 NETWORK="bridge"
 JD_PORT=5700
+NINJA_PORT=5701
 
 HAS_IMAGE=false
 PULL_IMAGE=true
 HAS_CONTAINER=false
 DEL_CONTAINER=true
 INSTALL_WATCH=false
+INSTALL_NINJA=true
 ENABLE_HANGUP=true
 ENABLE_WEB_PANEL=true
 OLD_IMAGE_ID=""
@@ -78,7 +80,7 @@ docker_install() {
 }
 
 docker_install
-warn "降低学习成本，小白回车到底，一路默认选择"
+warn "Faker系列仓库一键安装配置，一键安装的青龙版本为2.10.13稳定版，小白回车到底，一路默认选择"
 # 配置文件保存目录
 echo -n -e "\e[33m一、请输入配置文件保存的绝对路径（示例：/root)，回车默认为当前目录:\e[0m"
 read jd_path
@@ -97,6 +99,8 @@ RAW_PATH=$JD_PATH/ql/raw
 SCRIPT_PATH=$JD_PATH/ql/scripts
 LOG_PATH=$JD_PATH/ql/log
 JBOT_PATH=$JD_PATH/ql/jbot
+DEPS_PATH=$JD_PATH/ql/deps
+NINJA_PATH=$JD_PATH/ql/ninja
 
 # 检测镜像是否存在
 if [ ! -z "$(docker images -q $DOCKER_IMG_NAME:$TAG 2> /dev/null)" ]; then
@@ -139,7 +143,7 @@ input_container_name() {
 input_container_name
 
 # 是否安装 WatchTower
-inp "是否安装 containrrr/watchtower 自动更新 Docker 容器：\n1) 安装\n2) 不安装[默认](可以不装)"
+inp "是否安装 containrrr/watchtower 自动更新 Docker 容器：\n1) 安装\n2) 不安装[默认]"
 opt
 read watchtower
 if [ "$watchtower" = "1" ]; then
@@ -152,6 +156,7 @@ read net
 if [ "$net" = "1" ]; then
     NETWORK="host"
     MAPPING_JD_PORT=""
+    MAPPING_NINJA_PORT=""
 fi
 
 inp "是否在启动容器时自动启动挂机程序：\n1) 开启[默认]\n2) 关闭"
@@ -168,13 +173,13 @@ if [ "$pannel" = "2" ]; then
     ENABLE_WEB_PANNEL_ENV=""
 fi
 
-#inp "是否安装 Ninja：\n1) 安装[默认]\n2) 不安装"
-#opt
-#read Ninja
-#if [ "$Ninja" = "2" ]; then
-#    INSTALL_NINJA=false
-#    MAPPING_NINJA_PORT=""
-#fi
+inp "是否安装 Ninja：\n1) 安装[默认]\n2) 不安装"
+opt
+read Ninja
+if [ "$Ninja" = "2" ]; then
+    INSTALL_NINJA=false
+    MAPPING_NINJA_PORT=""
+fi
 
 # 端口问题
 modify_ql_port() {
@@ -186,29 +191,34 @@ modify_ql_port() {
         read JD_PORT
     fi
 }
-#modify_Ninja_port() {
-#    inp "是否修改 Ninja 端口[默认 5701]：\n1) 修改\n2) 不修改[默认]"
-#    opt
-#    read change_Ninja_port
-#    if [ "$change_Ninja_port" = "1" ]; then
-#        echo -n -e "\e[36m输入您想修改的端口->\e[0m"
-#        read NINJA_PORT
-#    fi
-#}
+modify_Ninja_port() {
+    inp "是否修改 Ninja 端口[默认 5701]：\n1) 修改\n2) 不修改[默认]"
+    opt
+    read change_Ninja_port
+    if [ "$change_Ninja_port" = "1" ]; then
+        echo -n -e "\e[36m输入您想修改的端口->\e[0m"
+        read NINJA_PORT
+    fi
+}
 if [ "$NETWORK" = "bridge" ]; then
     inp "是否映射端口：\n1) 映射[默认]\n2) 不映射"
     opt
     read port
     if [ "$port" = "2" ]; then
         MAPPING_JD_PORT=""
+        MAPPING_NINJA_PORT=""
     else
-        modify_ql_port    fi
+        modify_ql_port
+        if [ "$INSTALL_NINJA" = true ]; then
+            modify_Ninja_port
+        fi
+    fi
 fi
 
 
 # 配置已经创建完成，开始执行
 log "1.开始创建配置文件目录"
-PATH_LIST=($CONFIG_PATH $DB_PATH $REPO_PATH $RAW_PATH $SCRIPT_PATH $LOG_PATH $JBOT_PATH)
+PATH_LIST=($CONFIG_PATH $DB_PATH $REPO_PATH $RAW_PATH $SCRIPT_PATH $LOG_PATH $JBOT_PATH $NINJA_PATH $DEPS_PATH)
 for i in ${PATH_LIST[@]}; do
     mkdir -p $i
 done
@@ -244,14 +254,14 @@ if [ "$port" != "2" ]; then
     echo -e "\e[34m恭喜，端口:$JD_PORT 可用\e[0m"
     MAPPING_JD_PORT="-p $JD_PORT:5700"
 fi
-#if [ "$Ninja" != "2" ]; then
-#    while check_port $NINJA_PORT; do    
-#        echo -n -e "\e[31m端口:$NINJA_PORT 被占用，请重新输入 Ninja 面板端口：\e[0m"
-#        read NINJA_PORT
-#    done
-#    echo -e "\e[34m恭喜，端口:$NINJA_PORT 可用\e[0m"
-#    MAPPING_NINJA_PORT="-p $NINJA_PORT:5701"
-#fi
+if [ "$Ninja" != "2" ]; then
+    while check_port $NINJA_PORT; do    
+        echo -n -e "\e[31m端口:$NINJA_PORT 被占用，请重新输入 Ninja 面板端口：\e[0m"
+        read NINJA_PORT
+    done
+    echo -e "\e[34m恭喜，端口:$NINJA_PORT 可用\e[0m"
+    MAPPING_NINJA_PORT="-p $NINJA_PORT:5701"
+fi
 
 
 log "3.开始创建容器并执行"
@@ -264,7 +274,10 @@ docker run -dit \
     -v $RAW_PATH:/ql/raw \
     -v $SCRIPT_PATH:/ql/scripts \
     -v $JBOT_PATH:/ql/jbot \
+	-v $DEPS_PATH:/ql/deps \
+    -v $NINJA_PATH:/ql/ninja \
     $MAPPING_JD_PORT \
+    $MAPPING_NINJA_PORT \
     --name $CONTAINER_NAME \
     --hostname qinglong \
     --restart always \
@@ -294,67 +307,68 @@ if [ ! -f "$CONFIG_PATH/config.sh" ]; then
     if [ $? -ne 0 ] ; then
         cancelrun "** 错误：找不到配置文件！"
     fi
-fi
+ fi
+
 log "4.下面列出所有容器"
 docker ps
 
 # Nginx 静态解析检测
-#log "5.开始检测 Nginx 静态解析"
-#echo "开始扫描静态解析是否在线！"
-#ps -fe|grep nginx|grep -v grep
-#if [ $? -ne 0 ]; then
-#    echo "$(date +%Y-%m-%d" "%H:%M:%S) 扫描结束！Nginx 静态解析停止！准备重启！"
-#    docker exec -it $CONTAINER_NAME nginx -c /etc/nginx/nginx.conf
-#    echo "$(date +%Y-%m-%d" "%H:%M:%S) Nginx 静态解析重启完成！"
-#else
-#    echo "$(date +%Y-%m-%d" "%H:%M:%S) 扫描结束！Nginx 静态解析正常！"
-#fi
-#
-#if [ "$port" = "2" ]; then
-#    log "6.安装已完成，请自行调整端口映射并进入面板一次以便进行内部配置"
-#else
-#    log "6.安装已完成，请进入面板一次以便进行内部配置"
-#    log "6.1.用户名和密码已显示，请登录 ip:$JD_PORT"
-#    cat $CONFIG_PATH/auth.json
-#    echo -e "\n"
-#fi
+log "5.开始检测 Nginx 静态解析"
+echo "开始扫描静态解析是否在线！"
+ps -fe|grep nginx|grep -v grep
+if [ $? -ne 0 ]; then
+    echo "$(date +%Y-%m-%d" "%H:%M:%S) 扫描结束！Nginx 静态解析停止！准备重启！"
+    docker exec -it $CONTAINER_NAME nginx -c /etc/nginx/nginx.conf
+    echo "$(date +%Y-%m-%d" "%H:%M:%S) Nginx 静态解析重启完成！"
+else
+    echo "$(date +%Y-%m-%d" "%H:%M:%S) 扫描结束！Nginx 静态解析正常！"
+fi
+
+if [ "$port" = "2" ]; then
+    log "6.安装已完成，请自行调整端口映射并进入面板一次以便进行内部配置"
+else
+    log "6.安装已完成，请进入面板一次以便进行内部配置"
+    log "6.1.用户名和密码已显示，请登录 ip:$JD_PORT"
+    cat $CONFIG_PATH/auth.json
+    echo -e "\n"
+fi
 
 # 防止 CPU 占用过高导致死机
-echo -e "-------- 等待一会让青龙启动一下 --------"
-echo -e "-------- 一键互助脚本地址：curl -fsSL https://gitee.com/yanyuwangluo/onekey/raw/master/huzhu/huzhu.sh进容器执行 --------"
+echo -e "-------- 机器累了，休息 20s，趁机去操作一下吧 --------"
 sleep 20
 
 # 显示 auth.json
-#inp "是否显示被修改的密码：\n1) 显示[默认]\n2) 不显示"
-#opt
-#read display
-#if [ "$display" != "2" ]; then
-#    echo -e "\n"
-#    cat $CONFIG_PATH/auth.json
-#    echo -e "\n"
-#    log "6.2.用被修改的密码登录面板并进入"
-#fi  
+inp "是否显示被修改的密码：\n1) 显示[默认]\n2) 不显示"
+opt
+read display
+if [ "$display" != "2" ]; then
+    echo -e "\n"
+    cat $CONFIG_PATH/auth.json
+    echo -e "\n"
+    log "6.2.用被修改的密码登录面板并进入"
+fi  
 
 # token 检测
-#inp "是否已进入面板：\n1) 进入[默认]\n2) 未进入"
-#opt
-#read access
-#log "6.3.观察 token 是否成功生成"
-#cat $CONFIG_PATH/auth.json
-#echo -e "\n"
-#if [ "$access" != "2" ]; then
-#    if [ "$(grep -c "token" $CONFIG_PATH/auth.json)" != 0 ]; then
-#        log "7.开始安装或重装 Ninja"
-#        if [ "$INSTALL_NINJA" = true ]; then
-#            docker exec -it $CONTAINER_NAME bash -c "cd /ql;ps -ef|grep ninja|grep -v grep|awk '{print $1}'|xargs kill -9;rm -rf /ql/ninja;git clone https://ghproxy.com/https://github.com/shufflewzc/ninja.git /ql/ninja;cd /ql/ninja/backend;pnpm install;cp .env.example .env;cp sendNotify.js /ql/scripts/sendNotify.js;sed -i \"s/ALLOW_NUM=40/ALLOW_NUM=100/\" /ql/ninja/backend/.env;pm2 start"
-#            docker exec -it $CONTAINER_NAME bash -c "sed -i \"s/ALLOW_NUM=40/ALLOW_NUM=100/\" /ql/ninja/backend/.env && cd /ql/ninja/backend && pm2 start"
-#        fi
-#        log "8.开始青龙内部配置"
-#        docker exec -it $CONTAINER_NAME bash -c "$(curl -fsSL https://gitee.com/yanyuwangluo/tuku/raw/main/huzhu/huzhu.sh)"
-#    else
-#        warn "8.未检测到 token，取消内部配置"
-#    fi
-#fi
+inp "是否已进入面板：\n1) 进入[默认]\n2) 未进入"
+opt
+read access
+log "6.3.观察 token 是否成功生成"
+cat $CONFIG_PATH/auth.json
+echo -e "\n"
+if [ "$access" != "2" ]; then
+    if [ "$(grep -c "token" $CONFIG_PATH/auth.json)" != 0 ]; then
+        log "7.开始安装或重装 Ninja"
+        if [ "$INSTALL_NINJA" = true ]; then
+            docker exec -it $CONTAINER_NAME bash -c "cd /ql;ps -ef|grep ninja|grep -v grep|awk '{print $1}'|xargs kill -9;rm -rf /ql/ninja;git clone https://git.metauniverse-cn.com/https://github.com/shufflewzc/Waikiki_ninja.git /ql/ninja;cd /ql/ninja/backend;pnpm install;cp .env.example .env;cp sendNotify.js /ql/scripts/sendNotify.js;sed -i \"s/ALLOW_NUM=40/ALLOW_NUM=100/\" /ql/ninja/backend/.env;pm2 start"
+            docker exec -it $CONTAINER_NAME bash -c "sed -i \"s/ALLOW_NUM=40/ALLOW_NUM=100/\" /ql/ninja/backend/.env && cd /ql/ninja/backend && pm2 start"
+        fi
+        log "8.开始青龙内部配置"
+        docker exec -it $CONTAINER_NAME bash -c "$(curl -fsSL https://git.metauniverse-cn.com/https://github.com/shufflewzc/VIP/blob/main/Scripts/sh/1customCDN.sh)"
+    else
+        warn "8.未检测到 token，取消内部配置"
+    fi
 else
     exit 0
 fi
+
+log "/n部署完成了，另外Faker教程内有一键安装依赖脚本，按需使用"
